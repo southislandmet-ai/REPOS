@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NZ Model Forecaster · 6-hourly rain & snow charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logo">NZ MODEL FORECASTER<small>Multi-model rain &amp; snow → 6-hourly publication charts</small></div>
+    <div class="spacer"></div>
+    <div class="status"><span class="dot" id="apiDot"></span><span id="apiStatus">checking…</span></div>
+    <button class="btn small" id="btnDemo" title="Render the bundled example package (no API key needed)">Load demo package</button>
+    <button class="btn small" id="btnNewSession" title="Start a fresh chat session (inputs are kept)">New session</button>
+  </header>
+
+  <!-- ───────── Inputs ───────── -->
+  <section class="col inputs">
+    <div class="card">
+      <h2>Period &amp; timing <span class="hint">6-hourly steps are derived from this</span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <div class="seg" id="periodSeg"><button data-h="24" class="active">24 h</button><button data-h="48">48 h</button><button data-h="120">5 days</button></div>
+        <label>Start (NZ local)</label><input type="datetime-local" id="startLocal" step="3600">
+      </div>
+      <div class="help" id="windowsPreview"></div>
+    </div>
+
+    <div class="card">
+      <h2>Rainfall accumulations (mm) <span class="hint">one row per model run</span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <select id="rainLocPick"></select><button class="btn small" id="rainAddLoc">+ location</button>
+        <input type="text" id="rainCustomLoc" placeholder="custom spot e.g. Cropp River" style="width:150px"><button class="btn small" id="rainAddCustom">+</button>
+      </div>
+      <div class="tablewrap"><table class="grid" id="rainTable"></table></div>
+      <div class="row" style="margin-top:8px"><button class="btn small" id="rainAddModel">+ model row</button><button class="btn small ghost" id="rainPaste" title="Paste a tab-separated table copied from a spreadsheet: first row = location names, first column = model names">Paste TSV</button><span class="help">Totals for the selected period (24 h / 48 h / 5 days).</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Snow accumulations (cm) <span class="hint">separate table · plus snow level</span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <select id="snowLocPick"></select><button class="btn small" id="snowAddLoc">+ location</button>
+        <input type="text" id="snowCustomLoc" placeholder="custom e.g. Mt Hutt 1600 m" style="width:150px"><button class="btn small" id="snowAddCustom">+</button>
+      </div>
+      <div class="tablewrap"><table class="grid" id="snowTable"></table></div>
+      <div class="row" style="margin-top:8px"><button class="btn small" id="snowAddModel">+ model row</button><button class="btn small ghost" id="snowPaste">Paste TSV</button><span class="help">Snow level = lowest level each model brings snow to (m).</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Model imagery <span class="hint">GIF / PNG / JPG / WebP · describe each one</span></h2>
+      <div class="upload" id="dropZone">Drop model GIFs or charts here, or click to choose.<br><small>Animated GIFs are sampled as up to 6 frames in time order so the AI sees the evolution.</small><input type="file" id="fileInput" accept="image/*" multiple hidden></div>
+      <div id="uploadList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Forecaster notes <span class="hint">anything the AI should know</span></h2>
+      <textarea id="notes" rows="4" placeholder="e.g. ECMWF has been consistent for 3 runs; GFS flipped the low track 150 km north on 06Z. MetService has an Orange heavy rain warning for Westland ranges. Interested in Arthur's Pass and the Rakaia."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Branding on charts</h2>
+      <div class="row"><input type="text" id="brandName" placeholder="Brand / site name" style="flex:1"><input type="text" id="brandTagline" placeholder="Tagline (footer)" style="flex:1"></div>
+    </div>
+  </section>
+
+  <!-- ───────── Chat ───────── -->
+  <section class="col chat">
+    <div class="chatlog" id="chatLog"></div>
+    <div class="quick">
+      <button class="btn small" data-q="Here are my model accumulations, snow guidance and imagery. Analyse them with full NZ knowledge, tell me what pattern you see, then ask me which maps and extras you need before drawing.">Analyse &amp; ask me what you need</button>
+      <button class="btn small" data-q="Generate the complete 6-hourly package now with the maps we agreed.">Generate package</button>
+      <button class="btn small" data-q="Explain your model weighting and the main uncertainty in two short paragraphs.">Explain the blend</button>
+    </div>
+    <div class="composer">
+      <textarea id="composer" placeholder="Talk to the forecaster… (Enter = send, Shift+Enter = newline)"></textarea>
+      <button class="btn primary" id="btnSend">Send</button>
+    </div>
+  </section>
+
+  <!-- ───────── Output ───────── -->
+  <section class="col output">
+    <div class="viewer" id="viewer" hidden>
+      <div class="bar">
+        <span class="title" id="viewerTitle"></span>
+        <button class="btn small" id="prevPanel">‹</button><span id="panelPos" class="help"></span><button class="btn small" id="nextPanel">›</button>
+        <button class="btn small" id="btnPlay" title="Auto-advance through the steps">▶ Play</button>
+        <button class="btn small primary" id="btnPng">PNG 2×</button>
+        <button class="btn small" id="btnPng1">PNG 1×</button>
+        <button class="btn small" id="btnGif">GIF loop</button>
+        <button class="btn small" id="btnAllPng">All PNGs</button>
+        <button class="btn small ghost" id="btnCopy">Copy article</button>
+        <button class="btn small ghost" id="btnJson">JSON</button>
+      </div>
+      <canvas id="viewerCanvas" width="1600" height="900"></canvas>
+      <div class="help" id="viewerWarnings" style="margin-top:6px"></div>
+    </div>
+    <div class="filters" id="filters" hidden></div>
+    <div class="thumbs-grid" id="thumbs"></div>
+    <div class="empty" id="emptyOut">No package yet. Fill in the inputs, chat with the forecaster, and the 6-hourly charts will appear here. Or press <b>Load demo package</b> to preview the chart design.</div>
+  </section>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

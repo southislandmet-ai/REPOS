@@ -1,0 +1,20 @@
+{
+  "name": "nz-model-forecaster",
+  "version": "1.0.0",
+  "description": "AI-assisted New Zealand multi-model rain & snow accumulation forecaster with 6-hourly publication-quality weather maps",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "check": "node --check server/index.js && node --check server/prompt.js && node --check server/tools.js && node --check server/sessions.js",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "ajv": "^8.20.0",
+    "express": "^5.2.1"
+  },
+  "license": "MIT"
+}

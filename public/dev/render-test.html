@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Renderer test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#000}canvas{display:block;width:1600px;height:900px}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { ChartRenderer } from '../js/map.js';
+const q = new URLSearchParams(location.search);
+const [regions, places, forecast] = await Promise.all(['../data/nz_regions.json','../data/nz_places.json','../data/demo_forecast.json'].map(u => fetch(u).then(r => r.json())));
+await document.fonts.ready; try { await document.fonts.load('800 20px Inter'); } catch {}
+const R = new ChartRenderer({ regions, places, brand: { name: 'South Island Met', tagline: 'Multi-model NZ outlook' } });
+R.render({ forecast, stepIndex: Number(q.get('step') || 0), kind: q.get('kind') || 'mslp', scale: 1, canvas: document.getElementById('c') });
+window.__done = true;
+</script></body></html>
