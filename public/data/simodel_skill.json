@@ -1,0 +1,101 @@
+{
+  "_about": "SIMODEL regional skill & bias matrix for the South Island. weight = relative trust multiplier (1 = neutral) applied to a model's lattice in that sub-region for that field family; bias = typical sign/size of error to correct (precip: multiplicative, temp: additive °C, wind: multiplicative, snow_level: metres). Sources: NIWA/VUW/JGR convection-permitting evaluations (global & reanalysis products carry 3–5 m/yr on the Alps vs ~12 m observed; 2 km models still under-do enhancement over/west of major ranges), MetService/forum operational experience, Smith–Barstad orographic theory. Treat as expert prior, not verification truth; it is shown to the user as 'model bias notes'.",
+  "subregions": [
+    {"id": "west_coast_ranges", "name": "West Coast ranges & Alpine Fault zone", "poly": [[-40.9,171.9],[-41.6,172.3],[-42.5,171.6],[-43.4,170.6],[-44.3,169.3],[-44.9,168.2],[-45.3,167.4],[-44.6,166.9],[-43.6,168.6],[-42.6,169.9],[-41.9,170.9],[-41.3,171.3],[-40.7,171.6]]},
+    {"id": "west_coast_coast", "name": "West Coast coastal strip & Buller", "poly": [[-40.5,171.5],[-41.3,171.1],[-41.9,170.7],[-42.6,169.7],[-43.6,168.4],[-44.6,166.7],[-44.3,166.2],[-43.2,167.9],[-42.3,169.3],[-41.5,170.4],[-40.9,171.0],[-40.3,171.3]]},
+    {"id": "fiordland", "name": "Fiordland", "poly": [[-44.6,166.2],[-45.3,167.4],[-46.0,167.0],[-46.4,166.4],[-45.8,166.2],[-45.0,166.0]]},
+    {"id": "main_divide_east", "name": "Main Divide east slopes & headwaters (spillover zone)", "poly": [[-41.6,172.3],[-42.5,171.6],[-43.4,170.6],[-44.3,169.3],[-44.9,168.2],[-45.3,167.4],[-45.6,168.0],[-44.9,169.1],[-44.3,170.2],[-43.5,171.3],[-42.6,172.3],[-41.9,172.9]]},
+    {"id": "canterbury_plains", "name": "Canterbury Plains & coast", "poly": [[-42.4,173.2],[-43.0,172.9],[-43.6,172.9],[-44.3,171.6],[-44.9,171.2],[-44.9,170.9],[-44.4,170.9],[-43.6,171.6],[-43.0,172.2],[-42.5,172.8]]},
+    {"id": "canterbury_foothills", "name": "Canterbury high country & foothills", "poly": [[-42.3,172.3],[-42.6,172.3],[-43.5,171.3],[-44.3,170.2],[-44.9,169.1],[-44.9,170.9],[-44.4,170.9],[-43.6,171.6],[-43.0,172.2],[-42.5,172.8]]},
+    {"id": "kaikoura_marlborough", "name": "Kaikōura coast & Marlborough", "poly": [[-41.0,173.4],[-41.3,174.3],[-42.4,173.8],[-42.6,173.2],[-42.4,172.9],[-41.9,172.9],[-41.4,173.0]]},
+    {"id": "nelson_tasman", "name": "Nelson / Tasman / Golden Bay", "poly": [[-40.5,172.4],[-40.6,173.4],[-41.3,173.4],[-41.6,172.6],[-41.6,172.3],[-40.9,171.9],[-40.5,172.0]]},
+    {"id": "mackenzie_central_otago", "name": "Mackenzie Basin & Central Otago (inland basins)", "poly": [[-43.8,170.3],[-44.3,170.9],[-44.9,170.9],[-45.6,169.9],[-45.6,168.6],[-45.0,169.1],[-44.3,170.2]]},
+    {"id": "otago_coast", "name": "Coastal Otago & Dunedin", "poly": [[-44.9,171.2],[-45.6,170.9],[-46.3,169.9],[-46.6,169.4],[-46.0,169.5],[-45.6,169.9],[-44.9,170.9]]},
+    {"id": "southland", "name": "Southland & Foveaux", "poly": [[-45.6,168.6],[-45.6,169.9],[-46.6,169.4],[-46.7,168.3],[-46.4,167.6],[-45.9,167.5],[-45.6,168.0]]},
+    {"id": "southern_lakes", "name": "Southern Lakes (Wānaka / Queenstown / Lindis)", "poly": [[-44.3,169.3],[-44.9,169.1],[-45.6,168.6],[-45.6,168.0],[-45.3,167.4],[-44.9,168.2]]}
+  ],
+  "families": {"precip": "rain & snow accumulations", "temp": "2 m temperature", "temp_upper": "925/850 hPa temperature", "wind": "10 m wind & gusts", "mslp": "MSLP", "level": "snow / freezing level", "cloud": "cloud & humidity", "upper": "upper-air heights/thickness", "convective": "CAPE", "snow": "snowfall"},
+  "models": {
+    "ecmwf": {"base": {"precip": 1.0, "temp": 1.0, "wind": 1.0, "mslp": 1.15, "level": 1.0, "snow": 1.0, "temp_upper": 1.1, "cloud": 1.0, "upper": 1.15, "convective": 0.9},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 1.0, "bias": 0.62, "note": "9 km grid smooths the Alps: peak ranges totals typically 35–50% low; coastal strip ~15% low."}},
+        "west_coast_coast": {"precip": {"w": 1.1, "bias": 0.87}},
+        "fiordland": {"precip": {"w": 1.0, "bias": 0.7, "note": "Fiordland maxima under-done; placement of the stalled front shifts the max between Fiordland and Westland."}},
+        "main_divide_east": {"precip": {"w": 0.8, "bias": 1.35, "note": "Spills rain too far east of the Divide – trims needed beyond ~30 km east."}},
+        "canterbury_plains": {"precip": {"w": 0.9, "bias": 1.25, "note": "Too wet on the plains in NW flows (over-spill); good in easterly rain events."}, "wind": {"w": 0.9, "bias": 0.8, "note": "Nor'west gusts under-done on the plains; downslope acceleration not resolved."}, "temp": {"w": 1.0, "bias": -0.5, "note": "Föhn warmth slightly under-done."}},
+        "canterbury_foothills": {"precip": {"w": 0.9, "bias": 1.1}, "level": {"w": 1.0, "bias": 150, "note": "Snow level a touch high in deep cold easterlies; subtract ~150 m."}},
+        "kaikoura_marlborough": {"precip": {"w": 1.0, "bias": 0.85, "note": "Kaikōura Ranges enhancement in NE/SE flows under-done."}, "wind": {"w": 1.0, "bias": 0.9}},
+        "nelson_tasman": {"precip": {"w": 1.0, "bias": 0.8, "note": "Kahurangi/Richmond Range totals under-done in slow NE/N events (Aug 2022 type)."}},
+        "mackenzie_central_otago": {"temp": {"w": 0.9, "bias": 1.5, "note": "Inland basin cold pools and frosts under-done (too warm at night by 1–3 °C)."}, "precip": {"w": 1.0, "bias": 1.1}},
+        "otago_coast": {"precip": {"w": 1.0, "bias": 1.0}, "level": {"w": 1.0, "bias": 100}},
+        "southland": {"precip": {"w": 1.0, "bias": 0.95}},
+        "southern_lakes": {"precip": {"w": 0.9, "bias": 1.2, "note": "Spillover into the lake catchments over-spread to the lake basins themselves."}, "level": {"w": 1.0, "bias": 100}}
+      }},
+    "gfs": {"base": {"precip": 0.75, "temp": 0.85, "wind": 0.85, "mslp": 0.9, "level": 0.9, "snow": 0.8, "temp_upper": 0.95, "cloud": 0.8, "upper": 0.95, "convective": 0.8},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.8, "bias": 0.6, "note": "13 km grid: ranges totals 40–55% low; tends to be fast with frontal timing (rain shuts off early)."}},
+        "west_coast_coast": {"precip": {"w": 0.9, "bias": 0.85}},
+        "fiordland": {"precip": {"w": 0.8, "bias": 0.65}},
+        "main_divide_east": {"precip": {"w": 0.7, "bias": 1.4, "note": "Heaviest over-spill of the globals east of the Divide."}},
+        "canterbury_plains": {"precip": {"w": 0.8, "bias": 1.35, "note": "Over-does warm-sector/convective rain on the plains in NW flows."}, "wind": {"w": 0.8, "bias": 0.8}, "temp": {"w": 0.9, "bias": -0.5}},
+        "canterbury_foothills": {"precip": {"w": 0.8, "bias": 1.15}, "level": {"w": 1.0, "bias": 0, "note": "Often colder at 850 hPa than ECMWF in southerly outbreaks – and sometimes right; useful cold-tail member."}},
+        "kaikoura_marlborough": {"precip": {"w": 0.8, "bias": 0.85}},
+        "nelson_tasman": {"precip": {"w": 0.8, "bias": 0.8}},
+        "mackenzie_central_otago": {"temp": {"w": 0.8, "bias": 1.0}, "precip": {"w": 0.8, "bias": 1.15}},
+        "otago_coast": {"precip": {"w": 0.85, "bias": 1.0}},
+        "southland": {"precip": {"w": 0.85, "bias": 1.05, "note": "Showery SW flows too wet inland."}},
+        "southern_lakes": {"precip": {"w": 0.75, "bias": 1.25}}
+      }},
+    "ukmo": {"base": {"precip": 0.9, "temp": 0.95, "wind": 0.95, "mslp": 1.05, "level": 0.95, "snow": 0.9, "temp_upper": 1.0, "cloud": 0.95, "upper": 1.05, "convective": 0.8},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.9, "bias": 0.7, "note": "Tends dry in the ranges; sharp frontal structure."}},
+        "main_divide_east": {"precip": {"w": 0.9, "bias": 1.2}},
+        "canterbury_plains": {"precip": {"w": 1.0, "bias": 1.05, "note": "Good in blocked easterly rain events."}, "wind": {"w": 0.9, "bias": 0.85}},
+        "kaikoura_marlborough": {"precip": {"w": 1.05, "bias": 0.9, "note": "Handles Cook Strait/Kaikōura easterlies well."}},
+        "nelson_tasman": {"precip": {"w": 1.0, "bias": 0.85}}
+      }},
+    "access_g": {"base": {"precip": 0.8, "temp": 0.9, "wind": 0.9, "mslp": 1.0, "level": 0.9, "snow": 0.85, "temp_upper": 0.95, "cloud": 0.85, "upper": 1.0, "convective": 0.8},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.85, "bias": 0.68, "note": "Good Tasman-approach timing; under-does the ranges like other globals."}},
+        "main_divide_east": {"precip": {"w": 0.75, "bias": 1.4, "note": "Wet bias in the lee."}},
+        "canterbury_plains": {"precip": {"w": 0.8, "bias": 1.3, "note": "Lee wet bias; slightly slow with southerly changes."}},
+        "southland": {"precip": {"w": 0.9, "bias": 1.0}}
+      }},
+    "icon": {"base": {"precip": 0.8, "temp": 0.9, "wind": 0.9, "mslp": 0.95, "level": 0.9, "snow": 0.85, "temp_upper": 0.95, "cloud": 0.9, "upper": 0.95, "convective": 0.85},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.85, "bias": 0.7}},
+        "main_divide_east": {"precip": {"w": 0.8, "bias": 1.25}},
+        "canterbury_plains": {"precip": {"w": 0.85, "bias": 1.15, "note": "Over-deepens some lows → over-does southerly rain on the coast."}}
+      }},
+    "gem": {"base": {"precip": 0.7, "temp": 0.85, "wind": 0.85, "mslp": 0.9, "level": 0.85, "snow": 0.75, "temp_upper": 0.9, "cloud": 0.8, "upper": 0.9, "convective": 0.7},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.75, "bias": 0.7}},
+        "southland": {"precip": {"w": 0.7, "bias": 1.2, "note": "Noisy, too wet in showery SW flows."}},
+        "canterbury_plains": {"precip": {"w": 0.75, "bias": 1.2}}
+      }},
+    "aifs": {"base": {"precip": 0.45, "temp": 0.9, "wind": 0.8, "mslp": 1.2, "level": 0.8, "snow": 0.4, "temp_upper": 1.05, "cloud": 0.6, "upper": 1.2, "convective": 0.4},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 0.4, "bias": 0.5, "note": "AI model: superb pattern, smooth low-biased precipitation extremes. Use for synoptics, not totals."}},
+        "main_divide_east": {"precip": {"w": 0.4, "bias": 1.2}},
+        "canterbury_plains": {"precip": {"w": 0.5, "bias": 1.1}}
+      }},
+    "graphcast": {"base": {"precip": 0.4, "temp": 0.85, "wind": 0.75, "mslp": 1.1, "level": 0.75, "snow": 0.35, "temp_upper": 1.0, "cloud": 0.5, "upper": 1.1, "convective": 0.3}, "regional": {"west_coast_ranges": {"precip": {"w": 0.4, "bias": 0.5}}}},
+    "metservice_wrf": {"base": {"precip": 1.25, "temp": 1.15, "wind": 1.2, "mslp": 1.0, "level": 1.15, "snow": 1.2, "temp_upper": 1.0, "cloud": 1.05, "upper": 0.9, "convective": 1.0},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 1.3, "bias": 0.85, "note": "4 km grid resolves the Alps; ranges still ~15% low in the biggest events."}},
+        "main_divide_east": {"precip": {"w": 1.3, "bias": 1.0, "note": "Best spillover edge of the available models."}},
+        "canterbury_plains": {"precip": {"w": 1.2, "bias": 1.0}, "wind": {"w": 1.2, "bias": 1.05, "note": "Case studies show WRF over-predicts station wind speeds on fire-weather nor'west days – trim gusts ~5%."}},
+        "kaikoura_marlborough": {"wind": {"w": 1.3, "bias": 1.0, "note": "Resolves Cook Strait and Kaikōura funnelling."}},
+        "mackenzie_central_otago": {"temp": {"w": 1.2, "bias": 0.5}}
+      }},
+    "nzcsm": {"base": {"precip": 1.3, "temp": 1.25, "wind": 1.2, "mslp": 1.0, "level": 1.25, "snow": 1.3, "temp_upper": 1.0, "cloud": 1.1, "upper": 0.9, "convective": 1.1},
+      "regional": {
+        "west_coast_ranges": {"precip": {"w": 1.35, "bias": 0.9, "note": "1.5 km: best peak totals; can over-amplify convective cells."}},
+        "mackenzie_central_otago": {"temp": {"w": 1.4, "bias": 0.0, "note": "Captures inland cold pools that globals miss."}, "level": {"w": 1.3, "bias": 0}},
+        "canterbury_foothills": {"level": {"w": 1.3, "bias": 0, "note": "Resolves snow-level drag in heavy precipitation."}}
+      }},
+    "icon_d2_like": {"base": {"precip": 1.0, "temp": 1.0, "wind": 1.05, "mslp": 0.95, "level": 1.0, "snow": 1.0, "temp_upper": 0.95, "cloud": 1.0, "upper": 0.9, "convective": 1.0}, "regional": {"west_coast_ranges": {"precip": {"w": 1.0, "bias": 0.85, "note": "Downscaled WRF from a global driver: inherits the driver's timing errors."}}}},
+    "other": {"base": {"precip": 0.7, "temp": 0.8, "wind": 0.8, "mslp": 0.9, "level": 0.8, "snow": 0.7, "temp_upper": 0.9, "cloud": 0.8, "upper": 0.9, "convective": 0.7}, "regional": {}}
+  },
+  "defaults_by_resolution": {"_note": "Models without an entry fall back on base weights scaled by grid spacing: w = clamp(0.6 + 6/res_km, 0.6, 1.3) for precip."}
+}

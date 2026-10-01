@@ -1,108 +1,88 @@
-# NZ Model Forecaster
+# SIMODEL — South Island high-definition model blend
 
-An AI-assisted desk tool for New Zealand weather publishing. You feed it the raw ingredients a
-forecaster works from – multi-model rainfall accumulations (24 h / 48 h / 5 day), a separate snow
-table, and animated model imagery (GIFs) described in your own words – and chat with a Claude-powered
-forecaster that applies a detailed NZ meteorology knowledge base (Southern Alps orography, Kidson
-regimes, Tasman lows, southerly busters, east-coast blocking, ex-tropical cyclones, snow-level rules,
-per-model NZ biases). It asks you which maps and extras you want, then delivers a complete 6-hourly
-package rendered in the browser as publication-quality charts:
+SIMODEL turns the model charts you already look at every day (windy, tropicaltidbits, pivotalweather,
+weather.us, MetService, ECMWF charts…) into a **pan-and-zoom, 1.2 km South Island weather model** your site
+can publish. Claude reads each uploaded chart (legend, units, model, run, valid time, the field itself),
+SIMODEL blends the models with a South-Island-specific skill and bias matrix, then downscales the result
+over a real 600 m terrain model with orographic physics — so when you zoom into Canterbury you see the
+nor'west spillover, the Alps maximum, the lee shadow and the foothill gradients, not a blurry 13 km pixel.
 
-* **MSLP & fronts** – isobars every 4 hPa from a synthesised pressure field, H/L centres, frontal symbols, city weather
-* **6-hour rainfall** – regional shading, lowland + ranges values, named hotspots (Cropp River, Milford …)
-* **Wind & gusts** – barbs derived from the pressure gradient (Southern-Hemisphere geostrophy, surface backing) blended with the forecaster's regional winds
-* **Snow & snow level** – fresh snow shading, snow level per region, passes as hotspots
-* **Temperature** – city temperatures on an airmass wash
-* **Running rainfall total** – accumulation from the start of the period
-* **Overview** – pattern, confidence, model weights, model-mean → blended totals, snow summary, 6-hourly rain timeline
+Three pages (top navigation):
 
-Every chart is 1600 × 900 (exports at 2× = 3200 × 1800), branded with your site name, time-stamped in
-NZST/NZDT, and carries the "model guidance, not an official warning" line. Export single PNGs, all PNGs,
-an animated GIF loop of any map type, copy-ready article text, or the raw JSON package.
+| Page | What it does |
+|---|---|
+| **Model Suite** (`suite.html`) | Pick the model (every global + NZ regional model listed), drop a set of same-type charts (6-h precip & ptype, 24-h precip, 925/850 hPa or 2 m temperature, MSLP, wind, snow…), and the AI reads, classifies, dates and **orders them oldest → newest** (filename hours, run + lead and printed valid times are cross-checked; local-time captions are caught). Drag frames to fix order, double-click to correct a time. The catalogue shows every product SIMODEL can now build and how far out from *now* each one runs. **Run blend review** asks Claude to weigh the models by region/field for *this* situation, set the flow and physics, and say honestly what the data supports. |
+| **SIMODEL Viewer** (`viewer.html`) | Windy-style map limited to the South Island + 250 km of coast. Layers appear only when you have uploaded the data for them (native 6-h/12-h/24-h precipitation, 24-h totals built from 6-h windows, running accumulations, temperature, wind with particle animation, MSLP with isolines, snow, snow level…). Time slider in NZ time (uploads are UTC), model picker (SIMODEL blend or any single member), live value picker, relief shading, isolines, export PNG **with the colour key always included and no text on the overlay**. Confidence panel explains how many models, their agreement, lead time and readability, and SIMODEL smooths detail away when the data is thin. |
+| **Publish charts** (`index.html`) | The forecaster chat: feed accumulation tables and model GIFs, answer its questions, and it emits a validated 6-hourly package rendered as publication charts (MSLP/fronts, rain, wind barbs, snow, temperature, overview). |
+
+Settings (⚙, top right) stores your Anthropic API key **in your browser only**; the server forwards it per request. A server-side `ANTHROPIC_API_KEY` also works.
 
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env            # add your ANTHROPIC_API_KEY
-export $(grep -v '^#' .env | xargs)
-npm start                       # → http://localhost:3000
+npm start            # http://localhost:3000  → open Settings, paste your API key
 ```
 
-No key yet? Press **Load demo package** in the header to preview the chart design and exports with the
-bundled example (a Tasman low followed by a snowy southerly).
+No key yet? `npm run smoke` runs the whole pipeline against a built-in mock; the Publish page's
+**Load demo package** previews the chart design.
 
-Requirements: Node 20+. Chrome/Edge is recommended in the browser because they expose `ImageDecoder`,
-which lets the app sample up to six frames from an animated GIF (other browsers send the first frame).
+## How the science is built in
 
-## How a session runs
-
-1. **Period & timing** – choose 24 h, 48 h or 5 days and the start time (NZ local). The 6-hour windows
-   and their labels ("Thu 6 pm – midnight") are computed in the browser and handed to the AI verbatim.
-2. **Rainfall accumulations** – one row per model run (ECMWF, GFS, UKMO, ACCESS-G, ICON, GEM, AIFS,
-   MetService WRF, NZCSM, Windy variants, custom), one column per region or named spot. Paste a TSV
-   from a spreadsheet if you prefer.
-3. **Snow accumulations** – the same layout in cm, plus each model's snow level.
-4. **Model imagery** – drop GIFs/PNGs and type what each one is ("ECMWF 00Z MSLP + 6 h precip loop
-   T+0…T+48"). Animated GIFs are sampled in time order so the model sees the evolution.
-5. **Chat** – press *Analyse & ask me what you need*. The forecaster studies the frames and tables,
-   names the pattern, and asks one batched set of questions (which maps per step, extras such as
-   particular passes or rivers, anything ambiguous). Answer with the checkboxes, and it emits the
-   package. Ask for revisions in plain language ("make Westland wetter in step 3", "add temperature
-   maps") and it re-emits the whole package.
-6. **Output** – browse thumbnails, play the sequence, filter by map type, export.
-
-The server validates every package before it reaches you (all 16 regions and 22 cities per step, the
-right number of steps, per-region step rain summing to the blended total, systems inside the chart
-domain, gusts ≥ means, model weights summing to 1…) and sends failures back to the model to fix.
+* **Terrain** – Mapzen/Terrarium DEM mosaic at zoom 8 (~450–600 m) for the whole South Island
+  (`public/data/nz_dem_z8.png`, 2 MB). Used for hillshade, lapse-rate temperature, upslope precipitation,
+  ridge/valley wind factors and snow masking.
+* **Chart reading** (`server/suite.js`) – a strict tool schema makes Claude report layer type, original units
+  (in, mm, °F, kt, m/s, km/h, hPa…), accumulation window (3/6/12/24 h or run-total), run & valid time (UTC)
+  with confidence, a 0.5° lattice of values over NZ, wind direction or precipitation type as a secondary
+  field, synoptic features and extremes. Units are converted to canonical mm/cm/°C/hPa/kt.
+* **Self-sorting** (`selfSort`) – filename forecast hours (f036, +48h, 036), run + lead, printed valid time
+  and 12/13-h local-time offsets are reconciled; undated charts are slotted into the sequence; duplicates
+  and odd steps are flagged on the set.
+* **Regional skill & bias matrix** (`public/data/simodel_skill.json`) – per model × South Island
+  sub-region × field: trust weights and typical biases (e.g. globals 35–55 % low in the West Coast ranges and
+  over-spilling into the lee; GFS fast/progressive and over-wet on the plains in NW flow; ACCESS wet in the
+  lee; AIFS/GraphCast superb pattern but smooth precipitation; WRF/NZCSM best for the Alps, inland cold
+  pools and Cook Strait/Kaikōura funnelling; snow levels a touch high in deep cold easterlies). Shown to the
+  user as "bias notes" and overridable by the AI blend review.
+* **Downscaling** (`public/js/simodel.js`) – bicubic interpolation of the blended 0.5° field, then
+  * precipitation/snow: linear-theory style enhancement `exp(a·U·∇h)` evaluated a few km upwind (cloud
+    water drifts downwind before falling out), an elevation term, lee drying, and **renormalisation so
+    the blended 0.5° totals are conserved** — detail is redistributed, never invented at the coarse scale;
+    the flow comes from an uploaded 10 m wind layer, else geostrophic flow from MSLP, else the blend plan;
+  * temperature: lapse rate against model-scale terrain (5–8 °C/km, set by the review);
+  * wind/gusts: ridge speed-up and valley sheltering by elevation anomaly;
+  * snow: masked by snow level (uploaded, or inferred from temperature).
+* **Confidence → detail** – model count, weighted agreement, lead time, readability, time confidence and
+  field difficulty give a score; the output grid is always 0.015° but Gaussian smoothing widens from 0 km
+  (high) to ~10 km (very low) so a single model is never shown as crisp 1 km truth. The viewer says so.
 
 ## Architecture
 
 ```
-server/
-  index.js        Express 5 + SSE streaming; one Anthropic request per turn (manual tool loop)
-  prompt.js       Stable, cacheable system prompt (persona + renderer facts + knowledge base)
-  nz_knowledge.md The NZ meteorology & model-performance knowledge base (edit freely)
-  tools.js        ask_user and emit_forecast tool schemas (strict) + semantic validator (Ajv)
-  sessions.js     In-memory sessions persisted to data/sessions/*.json
-public/
-  index.html, css/app.css
-  js/app.js       UI state, inputs, uploads, chat (SSE), question forms, output browser
-  js/map.js       Canvas renderer: Mercator projection, pressure-field synthesis, marching-squares
-                  isobars, fronts, wind barbs, shading, sidebars, overview
-  js/gif.js       GIF frame sampling via WebCodecs ImageDecoder
-  js/gifenc.js    Dependency-free animated GIF encoder for the loop export
-  js/export.js    PNG / GIF / article text / JSON exports
-  data/           nz_regions.json (Natural Earth 10 m, simplified), nz_places.json, demo_forecast.json
-scripts/
-  make_demo.mjs   Regenerates the demo package (validated against the schema)
-  mock_anthropic.mjs + smoke.mjs   `npm run smoke` – full pipeline test without an API key
+server/index.js      Express 5 · per-request Anthropic client (browser key or env) · SSE streaming
+server/suite.js      layer/model catalogue · extract_chart + emit_blend_plan tools · self-sort · storage (data/suite.json)
+server/prompt.js     forecaster system prompt (+ server/nz_knowledge.md knowledge base)
+server/tools.js      ask_user / emit_forecast tools + validator for the publish package
+public/js/simodel.js SIMODEL engine (DEM, lattice blend, downscaling, confidence, palettes)
+public/js/viewer.js  Leaflet viewer: canvas field layer, hillshade base, particles, isolines, export
+public/js/suite.js   Model Suite page · public/js/app.js publish page · public/js/common.js nav/settings
+public/data/         DEM, regions, places, skill matrix, demo package
+scripts/             mock_anthropic.mjs (offline API stand-in), smoke.mjs (end-to-end test), make_demo.mjs
 ```
 
-Model: `claude-opus-5-5` with adaptive thinking (`display: summarized`), `effort: high`, streaming,
-strict tools with eager input streaming, and server-side refusal fallbacks (`fallbacks: "default"`).
-Override with `FORECASTER_MODEL`, `FORECASTER_EFFORT`, `FORECASTER_MAX_TOKENS`.
-
-### Prompt caching
-The system prompt (≈8 k tokens of knowledge base) carries a cache breakpoint and contains nothing
-volatile, so repeat turns in a session are served mostly from cache. Your inputs are sent in the user
-turn only when they change (hash-checked), and images only once.
+Model: `claude-opus-5-5`, adaptive thinking, streaming, strict tools, server-side refusal fallback on the
+chat route. Override with `FORECASTER_MODEL`, `FORECASTER_EFFORT`, `FORECASTER_MAX_TOKENS`.
 
 ## Tests
 
 ```bash
-npm run check     # syntax check of the server
-npm run smoke     # mock-API end-to-end: question → answers → package → closing text
-node scripts/make_demo.mjs   # regenerate + validate the demo package
+npm run check   # syntax
+npm run smoke   # mock API: chat package, chart ingestion + self-sort, blend plan, engine products & field
 ```
 
-`public/dev/render-test.html?kind=mslp&step=2` renders a single chart from the demo package for
-visual checks (kinds: overview, mslp, rain6h, wind, snow, temp, accum).
+## Honesty notes
 
-## Notes and limits
-
-* Charts are model-based guidance. MetService is New Zealand's official warning authority – the
-  footer says so on every chart; keep it there.
-* The AI never sees live model data: it reasons from what you type and upload. Garbage in, garbage out.
-* 5-day packages are large (20 steps). If a response hits the output limit, use fewer map types per step.
-* Uploaded frames live in the server session (data/sessions) – delete the session to remove them.
+SIMODEL is model-based guidance. It cannot know more than the charts you give it; with one model it shows
+terrain-redistributed single-model guidance and says so. MetService is the official warning authority and
+every export carries that line. Verify valid times on the Model Suite page before publishing.

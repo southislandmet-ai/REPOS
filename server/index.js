@@ -1,10 +1,12 @@
 import express from 'express';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, formatInputs } from './prompt.js';
 import { TOOLS, validateForecast, validateAsk } from './tools.js';
 import { createSession, getSession, save, deleteSession, listSessions } from './sessions.js';
+import { LAYERS, MODELS, LATTICE, extractTool, checkExtract, toCanonical, catalogue, getSet, addSet, updateSet, deleteSet, deleteChart, clearSuite, EXTRACT_SYSTEM, selfSort, planTool, checkPlan, PLAN_SYSTEM, getSuite, setPlan } from './suite.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -17,19 +19,124 @@ const app = express();
 app.use(express.json({ limit: '80mb' }));
 app.use(express.static(path.join(here, '..', 'public'), { extensions: ['html'] }));
 
-let client = null;
-function getClient() {
-  if (!client) client = new Anthropic();
-  return client;
+const clients = new Map();
+/** Per-request client: the browser may supply its own key (saved in its localStorage) via x-anthropic-key; else env credentials. */
+function getClient(req) {
+  const key = (req?.get?.('x-anthropic-key') || '').trim();
+  const k = key || '__env__';
+  if (!clients.has(k)) clients.set(k, key ? new Anthropic({ apiKey: key }) : new Anthropic());
+  return clients.get(k);
 }
+function hasCredentials(req) { return Boolean((req?.get?.('x-anthropic-key') || '').trim() || process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN); }
 
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    model: MODEL,
-    effort: EFFORT,
-    has_credentials: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN),
-  });
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, model: MODEL, effort: EFFORT, has_credentials: hasCredentials(req), env_credentials: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) });
+});
+
+// ───────────────────────── SIMODEL suite ─────────────────────────
+app.get('/api/suite/meta', (_req, res) => res.json({ layers: LAYERS, models: MODELS, lattice: LATTICE }));
+app.get('/api/suite', (_req, res) => res.json(catalogue()));
+app.get('/api/suite/set/:id', (req, res) => { const s = getSet(req.params.id); if (!s) return res.status(404).json({ error: 'not found' }); res.json(s); });
+app.put('/api/suite/set/:id', (req, res) => { const s = updateSet(req.params.id, req.body || {}); if (!s) return res.status(404).json({ error: 'not found' }); res.json(s); });
+app.delete('/api/suite/set/:id', (req, res) => res.json({ ok: deleteSet(req.params.id) }));
+app.delete('/api/suite/set/:id/chart/:cid', (req, res) => res.json({ ok: deleteChart(req.params.id, req.params.cid) }));
+app.delete('/api/suite', (_req, res) => { clearSuite(); res.json({ ok: true }); });
+app.get('/api/suite/fields', (req, res) => {
+  // Full numeric payload for the viewer (all sets with values).
+  const ids = (req.query.sets || '').split(',').filter(Boolean);
+  const all = catalogue().sets.map((s) => getSet(s.id)).filter((s) => !ids.length || ids.includes(s.id));
+  res.json({ layers: LAYERS, models: MODELS, lattice: LATTICE, sets: all, plan: getSuite().plan || null });
+});
+
+/** Analyse a batch of same-type chart images from one model with Claude vision; streams progress; stores a set. */
+app.post('/api/suite/analyze', async (req, res) => {
+  const { model_id = 'other', declared_layer = '', notes = '', images = [], set_id = null } = req.body || {};
+  if (!images.length) return res.status(400).json({ error: 'No images.' });
+  if (!hasCredentials(req)) return res.status(401).json({ error: 'No API key. Open Settings and paste your Anthropic API key.' });
+  const send = sse(res);
+  let aborted = false; res.on('close', () => { if (!res.writableFinished) aborted = true; });
+  const anthropic = getClient(req);
+  const model = MODELS.find((m) => m.id === model_id) || MODELS[MODELS.length - 1];
+  const nowIso = new Date().toISOString();
+  const results = new Array(images.length).fill(null);
+  let done = 0;
+
+  async function analyzeOne(i) {
+    const img = images[i];
+    const userText = `Model (as selected by the forecaster): ${model.name}. ${declared_layer ? `The forecaster says this set of ${images.length} charts is "${LAYERS.find((l) => l.id === declared_layer)?.label || declared_layer}" (layer_id ${declared_layer}); confirm or correct.` : `This is one of ${images.length} charts of the same type.`} File name: "${img.name}" (file names often contain the forecast hour, e.g. _036 or f36). Today's date (UTC): ${nowIso}. ${notes ? `Forecaster notes: ${notes}` : ''}
+Other files in this batch: ${images.map((x) => x.name).join(', ')}.`;
+    const messages = [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data } }, { type: 'text', text: userText }] }];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const stream = anthropic.beta.messages.stream({
+        model: MODEL, max_tokens: 24000,
+        system: [{ type: 'text', text: EXTRACT_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        tools: [extractTool], thinking: { type: 'adaptive' }, output_config: { effort: 'medium' }, messages,
+      });
+      let chars = 0;
+      for await (const ev of stream) {
+        if (aborted) { stream.controller.abort(); return; }
+        if (ev.type === 'content_block_delta' && ev.delta.type === 'input_json_delta') { chars += ev.delta.partial_json.length; if (chars % 2000 < 40) send('progress', { index: i, name: img.name, chars }); }
+      }
+      const msg = await stream.finalMessage();
+      if (msg.stop_reason === 'refusal') { results[i] = { error: 'declined by the model' }; return; }
+      const tu = msg.content.find((b) => b.type === 'tool_use' && b.name === 'extract_chart');
+      if (!tu) { results[i] = { error: msg.content.filter((b) => b.type === 'text').map((b) => b.text).join(' ').slice(0, 300) || 'no extraction returned' }; return; }
+      const problems = checkExtract(tu.input);
+      if (problems.length && attempt === 0) {
+        messages.push({ role: 'assistant', content: msg.content }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: tu.id, is_error: true, content: `Fix and call extract_chart again: ${problems.join('; ')}` }] });
+        continue;
+      }
+      const x = tu.input;
+      results[i] = {
+        id: `${Date.now().toString(36)}${i}`,
+        name: img.name, thumb: img.thumb || null,
+        layer_id: x.chart.layer_id, layer_label: x.chart.layer_label, units_original: x.chart.units,
+        model_detected: x.chart.model_detected, source_detected: x.chart.source_detected,
+        run_time_utc: x.chart.run_time_utc, valid_time_utc: x.chart.valid_time_utc, valid_time_text: x.chart.valid_time_text,
+        lead_hours: x.chart.lead_hours, accumulation_hours: x.chart.accumulation_hours, time_confidence: x.chart.time_confidence,
+        domain_covers_nz: x.chart.domain_covers_nz, legend_summary: x.chart.legend_summary,
+        values: toCanonical(x.chart.layer_id, x.chart.units, x.values),
+        secondary_kind: x.secondary_kind, secondary_values: x.secondary_kind === 'none' ? [] : x.secondary_values,
+        features: x.features, extremes: x.extremes, quality: x.quality, problems,
+      };
+      return;
+    }
+  }
+
+  try {
+    const queue = images.map((_, i) => i); const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
+      while (queue.length && !aborted) { const i = queue.shift(); try { await analyzeOne(i); } catch (e) { results[i] = { error: e?.message || String(e) }; } done++; send('chart', { index: i, done, total: images.length, result: results[i] && !results[i].error ? { ...results[i], values: undefined, secondary_values: undefined } : results[i] }); }
+    });
+    await Promise.all(workers);
+    if (aborted) return;
+    const good = results.filter((r) => r && !r.error);
+    if (!good.length) { send('error', { text: 'No chart could be read.' }); return; }
+    // Order: by valid time (unknown times last, keeping upload order), then infer missing times from neighbours at 6-h spacing when possible.
+    good.forEach((c, i) => (c.upload_index = results.indexOf(c)));
+    const sorted = selfSort(good);
+    const t = (c) => (c.valid_time_utc ? Date.parse(c.valid_time_utc) : NaN);
+    good.sort((a, b) => { const ta = t(a), tb = t(b); if (Number.isNaN(ta) && Number.isNaN(tb)) return a.upload_index - b.upload_index; if (Number.isNaN(ta)) return 1; if (Number.isNaN(tb)) return -1; return ta - tb; });
+    good.forEach((c, i) => (c.order = i));
+    const layerCounts = {}; for (const c of good) layerCounts[c.layer_id] = (layerCounts[c.layer_id] || 0) + 1;
+    const layer_id = declared_layer && LAYERS.some((l) => l.id === declared_layer) ? declared_layer : Object.entries(layerCounts).sort((a, b) => b[1] - a[1])[0][0];
+    const mixed = Object.keys(layerCounts).length > 1;
+    const runs = [...new Set(good.map((c) => c.run_time_utc).filter(Boolean))];
+    const set = {
+      model_id: model.id, model_name: model.name, layer_id, layer_label: LAYERS.find((l) => l.id === layer_id)?.label || layer_id,
+      run_time_utc: runs[0] || '', runs_detected: runs, notes, mixed_layers: mixed, layer_counts: layerCounts,
+      charts: good, failures: results.filter((r) => r && r.error).map((r) => r.error), sort_warnings: sorted.warnings, time_step_h: sorted.step,
+    };
+    if (!set.run_time_utc && sorted.run) set.run_time_utc = sorted.run;
+    const saved = set_id ? updateSet(set_id, set) || addSet(set) : addSet(set);
+    const { charts, ...meta } = saved;
+    send('set', { set: { ...meta, charts: charts.map(({ values, secondary_values, ...c }) => c) } });
+    send('done', {});
+  } catch (err) {
+    console.error(err);
+    let msg = err?.message || String(err);
+    if (err instanceof Anthropic.AuthenticationError) msg = 'Authentication failed: check the API key in Settings.';
+    send('error', { text: msg });
+  } finally { res.end(); }
 });
 
 app.get('/api/sessions', (_req, res) => res.json(listSessions()));
@@ -73,10 +180,43 @@ function buildUserContent({ text, inputs, inputsChanged, images }) {
   return content;
 }
 
+/** AI review of the whole suite → blend plan stored in the suite. */
+app.post('/api/suite/plan', async (req, res) => {
+  if (!hasCredentials(req)) return res.status(401).json({ error: 'No API key. Open Settings and paste your Anthropic API key.' });
+  const { notes = '' } = req.body || {};
+  const suite = getSuite();
+  if (!suite.sets.length) return res.status(400).json({ error: 'Upload some charts first.' });
+  const skill = JSON.parse(fs.readFileSync(path.join(here, '..', 'public', 'data', 'simodel_skill.json'), 'utf8'));
+  const summary = suite.sets.map((s) => ({ set_id: s.id, model_id: s.model_id, model: s.model_name, layer: s.layer_label, layer_id: s.layer_id, run: s.run_time_utc, step_h: s.time_step_h, charts: s.charts.map((c) => ({ name: c.name, valid: c.valid_time_utc, lead_h: c.lead_hours, accum_h: c.accumulation_hours, readability: c.quality?.readability, time_conf: c.time_confidence, systems: c.features?.systems?.slice(0, 4), fronts: c.features?.fronts?.map((f) => f.kind), extremes: c.extremes?.slice(0, 4), notes: c.quality?.notes })) }));
+  const user = `Current time (UTC): ${new Date().toISOString()}\nForecaster notes: ${notes || '(none)'}\n\n<suite>\n${JSON.stringify(summary)}\n</suite>\n\n<static_skill_matrix>\n${JSON.stringify({ subregions: skill.subregions.map((r) => ({ id: r.id, name: r.name })), models: skill.models })}\n</static_skill_matrix>`;
+  try {
+    const anthropic = getClient(req);
+    const messages = [{ role: 'user', content: user }];
+    let plan = null, text = '';
+    for (let attempt = 0; attempt < 2 && !plan; attempt++) {
+      const msg = await anthropic.beta.messages.stream({ model: MODEL, max_tokens: 16000, system: [{ type: 'text', text: PLAN_SYSTEM, cache_control: { type: 'ephemeral' } }], tools: [planTool], thinking: { type: 'adaptive' }, output_config: { effort: EFFORT }, messages }).finalMessage();
+      if (msg.stop_reason === 'refusal') return res.status(400).json({ error: 'The model declined this request.' });
+      text += msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+      const tu = msg.content.find((b) => b.type === 'tool_use' && b.name === 'emit_blend_plan');
+      if (!tu) break;
+      const problems = checkPlan(tu.input);
+      if (problems.length && attempt === 0) { messages.push({ role: 'assistant', content: msg.content }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: tu.id, is_error: true, content: `Fix: ${problems.join('; ')}` }] }); continue; }
+      plan = tu.input;
+    }
+    if (!plan) return res.status(500).json({ error: text || 'No plan produced.' });
+    plan.created_at = new Date().toISOString(); plan.notes = notes;
+    setPlan(plan);
+    res.json({ plan, text });
+  } catch (err) {
+    console.error(err); res.status(500).json({ error: err instanceof Anthropic.AuthenticationError ? 'Authentication failed: check the API key in Settings.' : (err?.message || String(err)) });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   const { session_id, text = '', inputs = null, inputs_hash = null, images = [], tool_result = null } = req.body || {};
   const session = getSession(session_id || '');
   if (!session) return res.status(404).json({ error: 'Unknown session. Reload the page.' });
+  if (!hasCredentials(req)) return res.status(401).json({ error: 'No API key. Open Settings and paste your Anthropic API key.' });
   const send = sse(res);
   let aborted = false;
   // Note: req 'close' fires once the body is consumed in modern Node; use the response to detect a dropped client.
@@ -101,7 +241,7 @@ app.post('/api/chat', async (req, res) => {
     if (inputsChanged) session.last_inputs_hash = inputs_hash;
     save(session);
 
-    const anthropic = getClient();
+    const anthropic = getClient(req);
     let useFallbacks = true;
     let forecastRetries = 0;
 

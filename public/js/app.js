@@ -1,6 +1,7 @@
 import { ChartRenderer, WEATHER_LABEL } from './map.js';
 import { sampleImageFile } from './gif.js';
 import { exportPng, exportAllPng, exportGif, articleText, exportJson } from './export.js';
+import { mountNav, apiFetch, settings, openSettings } from './common.js';
 
 // ───────────────────────── State ─────────────────────────
 const $ = (s) => document.querySelector(s);
@@ -218,8 +219,8 @@ async function sendChat(text, toolResult = null) {
     const newUploads = uploads.filter((u) => !u.sent && u.frames.length);
     const body = { session_id: id, text, inputs: payload, inputs_hash: h, images: newUploads.map((u) => ({ name: u.name, description: u.description, total_frames: u.total_frames, frames: u.frames.map((f) => ({ media_type: f.media_type, data: f.data })) })), tool_result: toolResult };
     if (text || toolResult) addMsg('user', toolResult ? toolResult.summary : text, { tag: toolResult ? 'answers' : null, thumbs: newUploads.map((u) => u.frames[0]?.preview).filter(Boolean) });
-    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); addMsg('system', e.error || `Request failed (${res.status})`, { error: true }); if (res.status === 404) { session.id = null; localStorage.removeItem('nzmf.session'); } return; }
+    const res = await apiFetch('/api/chat', { method: 'POST', body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); addMsg('system', e.error || `Request failed (${res.status})`, { error: true }); if (res.status === 401) openSettings(); if (res.status === 404) { session.id = null; localStorage.removeItem('nzmf.session'); } return; }
     for (const u of newUploads) u.sent = true; renderUploads();
     const assistant = addMsg('assistant', ''); let thinkEl = null, progEl = null, gotText = false;
     await readSse(res, (event, data) => {
@@ -335,15 +336,18 @@ function initOutput() {
 
 // ───────────────────────── Boot ─────────────────────────
 async function boot() {
+  mountNav('index.html');
+  if (!inputs.brand.name && settings.brand.name) { inputs.brand = { ...settings.brand }; saveInputs(); }
   initInputs(); initOutput();
   $('#btnSend').onclick = () => { const t = $('#composer').value.trim(); if (!t && !uploads.some((u) => !u.sent)) return; $('#composer').value = ''; sendChat(t); };
   $('#composer').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#btnSend').click(); } });
   for (const b of document.querySelectorAll('.quick button')) b.onclick = () => sendChat(b.dataset.q);
   $('#btnDemo').onclick = async () => { const f = await fetch('data/demo_forecast.json').then((r) => r.json()); setForecast(f, []); addMsg('system', 'Demo package loaded locally (not sent to the AI). Use it to preview the chart design and exports.'); };
+  document.addEventListener('settings-changed', async () => { const h = await apiFetch('/api/health').then((r) => r.json()); $('#apiDot').classList.toggle('ok', h.has_credentials); $('#apiStatus').textContent = h.has_credentials ? `${h.model} · effort ${h.effort}` : 'No API key – open Settings'; });
   $('#btnNewSession').onclick = async () => { if (!confirm('Start a new chat session? Your inputs and uploads stay; the conversation and current package are cleared.')) return; session = { id: null, pendingToolUseId: null }; localStorage.removeItem('nzmf.session'); log.innerHTML = ''; for (const u of uploads) u.sent = false; renderUploads(); await ensureSession(); addMsg('system', 'New session started.'); };
   try {
-    const h = await fetch('/api/health').then((r) => r.json());
-    $('#apiDot').classList.toggle('ok', h.has_credentials); $('#apiStatus').textContent = h.has_credentials ? `${h.model} · effort ${h.effort}` : 'No API key – set ANTHROPIC_API_KEY to enable chat';
+    const h = await apiFetch('/api/health').then((r) => r.json());
+    $('#apiDot').classList.toggle('ok', h.has_credentials); $('#apiStatus').textContent = h.has_credentials ? `${h.model} · effort ${h.effort}` : 'No API key – open Settings';
   } catch { $('#apiStatus').textContent = 'server offline'; }
   await document.fonts.ready;
   await restoreSession();

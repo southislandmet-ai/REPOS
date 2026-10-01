@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIMODEL · Model Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logo">SIMODEL<small>Model Suite · upload, verify, order</small></div>
+    <div class="spacer"></div>
+    <div class="status"><span class="dot" id="apiDot"></span><span id="apiStatus">checking…</span></div>
+  </header>
+  <section class="suite">
+    <div class="left">
+      <div class="steps">
+        <div class="step">
+          <h3>Choose the model</h3>
+          <div class="modelgrid" id="modelGrid"></div>
+        </div>
+        <div class="step">
+          <h3>What type of charts is this set? <span class="help">(the AI confirms it; leave on Auto if unsure)</span></h3>
+          <div class="layerpick" id="layerPick"></div>
+        </div>
+        <div class="step">
+          <h3>Add the charts for that set</h3>
+          <div class="upload" id="dropZone">Drop every chart of this model &amp; type here (any order).<br><small>PNG / JPG / GIF / WebP from windy, tropicaltidbits, pivotalweather, weather.us, MetService, ECMWF charts… The AI reads the legend, units, model, run and valid time from each image and orders them oldest → newest.</small><input type="file" id="fileInput" accept="image/*" multiple hidden></div>
+          <div class="queue" id="queue"></div>
+          <div class="row" style="margin-top:8px">
+            <input type="text" id="setNotes" placeholder="Notes for the AI (e.g. '12-hourly charts', 'times shown are NZDT', 'run 00Z Wed')" style="flex:1">
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn primary" id="btnAnalyze" disabled>Analyse &amp; add to suite</button>
+            <button class="btn ghost small" id="btnClearQueue">clear</button>
+            <span class="help" id="analyzeStatus"></span>
+          </div>
+          <div class="progressbar" id="progress" hidden><i style="width:0"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="planbox" id="planBox">
+        <h3>SIMODEL blend review</h3>
+        <div class="help" id="planText">Once two or more sets are in the suite, run the AI review: it weighs each model by region and field for this situation, picks the flow and physics for downscaling, and tells you honestly what the data can support.</div>
+        <div class="row" style="margin-top:8px"><button class="btn small primary" id="btnPlan">Run blend review</button><input type="text" id="planNotes" placeholder="Context for the review (optional)" style="flex:1"><a class="btn small" href="viewer.html">Open SIMODEL Viewer →</a></div>
+      </div>
+      <div class="card">
+        <h2>What SIMODEL can show from this suite <span class="hint" id="covHint"></span></h2>
+        <div class="cov" id="coverage"><div class="help">Nothing uploaded yet.</div></div>
+      </div>
+      <div class="card catalogue">
+        <h2>Uploaded sets <span class="hint"><button class="btn small ghost" id="btnClearSuite">clear suite</button></span></h2>
+        <div id="sets"></div>
+      </div>
+    </div>
+  </section>
+</div>
+<script type="module" src="js/suite.js"></script>
+</body>
+</html>

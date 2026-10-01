@@ -10,11 +10,14 @@
     "check": "node --check server/index.js && node --check server/prompt.js && node --check server/tools.js && node --check server/sessions.js",
     "smoke": "node scripts/smoke.mjs"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "ajv": "^8.20.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "leaflet": "^1.9.4"
   },
   "license": "MIT"
 }

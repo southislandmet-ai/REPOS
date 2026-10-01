@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIMODEL · Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="viewer">
+<div class="app">
+  <header class="top">
+    <div class="logo">SIMODEL<small>High-definition South Island model blend</small></div>
+    <div class="spacer"></div>
+    <div class="status"><span id="suiteStatus">loading…</span></div>
+  </header>
+  <section class="vwrap">
+    <div id="map"></div>
+    <div class="ctl layers" id="layersCtl"></div>
+    <div class="ctl brand" id="brandCtl">SIMODEL<small id="brandSub"></small></div>
+    <div class="ctl tools" id="toolsCtl">
+      <button class="btn small" id="btnBasemap" title="Toggle online street basemap">Basemap</button>
+      <button class="btn small" id="btnLabels" title="Toggle place names">Labels</button>
+      <button class="btn small" id="btnIso" title="Toggle isolines">Isolines</button>
+      <button class="btn small" id="btnRelief" title="Shade the overlay with terrain relief">Relief</button>
+      <button class="btn small" id="btnWind" title="Toggle wind particles">Particles</button>
+      <button class="btn small primary" id="btnExport" title="Export the current view as a PNG with the key">Export PNG</button>
+    </div>
+    <div class="ctl models" id="modelsCtl"></div>
+    <div class="ctl confidence" id="confCtl" hidden></div>
+    <div class="ctl legend" id="legendCtl" hidden></div>
+    <div class="ctl timeline" id="timelineCtl" hidden></div>
+    <div class="ctl picker" id="pickerCtl" hidden></div>
+    <div class="ctl empty" id="emptyCtl"><b>No SIMODEL products yet.</b><p class="help">Upload model charts in the <a href="suite.html">Model Suite</a>. The products listed here change with what you upload: 6-hour precipitation, 24-hour totals (native or built from 6-hourly windows), temperature, wind, MSLP, snow…</p></div>
+  </section>
+</div>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script type="module" src="js/viewer.js"></script>
+</body>
+</html>
